@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { LogIn, LogOut, Moon, Shield, Sun } from 'lucide-react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { LogOut, Moon, Shield, Sun } from 'lucide-react';
 import { DayNavigation } from './components/DayNavigation';
 import { BookingGrid } from './components/BookingGrid';
 import { BookingModal } from './components/BookingModal';
@@ -29,15 +29,18 @@ function App() {
     localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light',
   );
   const [adminViewAll, setAdminViewAll] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginName, setLoginName] = useState('');
 
-  const { user, loading, login, logout } = useAuth();
-  const isAdmin = Boolean(user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase()));
+  const { user, loading, loginWithWorkEmail, logout } = useAuth();
+  const isAdmin = Boolean(user?.userEmail && ADMIN_EMAILS.includes(user.userEmail.toLowerCase()));
 
   const { roomDayBookings, myBookings, addBooking, removeBooking } = useBookings(
     selectedRoomId,
     selectedDate,
-    user?.uid,
+    user?.userId,
     isAdmin && adminViewAll,
+    user?.accessToken,
   );
 
   const selectedRoom = ROOMS.find((room) => room.id === selectedRoomId) ?? ROOMS[0];
@@ -48,6 +51,18 @@ function App() {
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
     }, 2600);
+  };
+
+  const handleLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    try {
+      await loginWithWorkEmail(loginEmail, loginName);
+      setLoginEmail('');
+      setLoginName('');
+      addToast('success', 'Logged in successfully.');
+    } catch (error) {
+      addToast('error', error instanceof Error ? error.message : 'Login failed.');
+    }
   };
 
   const closeModal = () => {
@@ -63,7 +78,7 @@ function App() {
 
   const handleOpenBooking = (slot: string) => {
     if (!user) {
-      addToast('error', 'Please login first to create a booking.');
+      addToast('error', 'Please login with your work email first.');
       return;
     }
     setSelectedStartTime(slot);
@@ -71,7 +86,9 @@ function App() {
     const [h, m] = slot.split(':').map(Number);
     const end = new Date();
     end.setHours(h, m + 30, 0, 0);
-    setCustomEndTime(`${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`);
+    setCustomEndTime(
+      `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`,
+    );
   };
 
   const handleCreateBooking = async () => {
@@ -83,9 +100,9 @@ function App() {
       startTime: customStartTime,
       endTime: customEndTime,
       meetingTitle,
-      userId: user.uid,
-      userEmail: user.email ?? 'unknown@ecocare.id',
-      userName: user.displayName ?? user.email ?? 'EcoCare User',
+      userId: user.userId,
+      userEmail: user.userEmail,
+      userName: user.userName,
     });
 
     if (!result.ok) {
@@ -99,7 +116,7 @@ function App() {
 
   const canManageBooking = (booking: Booking) => {
     if (!user) return false;
-    return isAdmin || booking.userId === user.uid;
+    return isAdmin || booking.userId === user.userId;
   };
 
   const confirmCancellation = async (booking: Booking) => {
@@ -131,7 +148,7 @@ function App() {
 
   const authLabel = useMemo(() => {
     if (!user) return 'Not signed in';
-    return user.displayName ?? user.email ?? 'EcoCare User';
+    return `${user.userName} (${user.userEmail})`;
   }, [user]);
 
   if (loading) {
@@ -170,7 +187,7 @@ function App() {
               {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
               {theme === 'light' ? 'Dark mode' : 'Light mode'}
             </button>
-            {user ? (
+            {user && (
               <button
                 type="button"
                 onClick={logout}
@@ -179,18 +196,20 @@ function App() {
                 <LogOut size={16} />
                 Logout
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={login}
-                className="flex items-center gap-2 rounded-lg bg-eco-600 px-3 py-2 text-sm text-white"
-              >
-                <LogIn size={16} />
-                Sign in with Google
-              </button>
             )}
           </div>
         </header>
+
+        {!user && (
+          <form onSubmit={handleLogin} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+            <p className="mb-3 text-sm font-medium">Sign in with your EcoCare work email</p>
+            <div className="grid gap-2 md:grid-cols-3">
+              <input value={loginName} onChange={(e) => setLoginName(e.target.value)} placeholder="Full name" className="rounded-lg border border-slate-300 px-3 py-2 dark:border-slate-600 dark:bg-slate-800" />
+              <input value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="name@ecocare.id" className="rounded-lg border border-slate-300 px-3 py-2 dark:border-slate-600 dark:bg-slate-800" />
+              <button className="rounded-lg bg-eco-600 px-3 py-2 text-white">Login</button>
+            </div>
+          </form>
+        )}
 
         <RoomSelector rooms={ROOMS} selectedRoomId={selectedRoomId} onSelect={setSelectedRoomId} />
 
