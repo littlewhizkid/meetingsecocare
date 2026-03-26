@@ -6,7 +6,6 @@ type Props = {
   bookings: Booking[];
   onSlotClick: (time: string) => void;
   onCancelBooking: (booking: Booking) => void;
-  canManageBooking: (booking: Booking) => boolean;
 };
 
 const findBookingAtTime = (bookings: Booking[], slotTime: string): Booking | undefined => {
@@ -18,7 +17,7 @@ const findBookingAtTime = (bookings: Booking[], slotTime: string): Booking | und
   });
 };
 
-export const BookingGrid = ({ slots, bookings, onSlotClick, onCancelBooking, canManageBooking }: Props) => {
+export const BookingGrid = ({ slots, bookings, onSlotClick, onCancelBooking }: Props) => {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
       <div className="grid grid-cols-[110px_1fr] text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -46,32 +45,25 @@ export const BookingGrid = ({ slots, bookings, onSlotClick, onCancelBooking, can
                 </button>
               )}
 
-              {booking && (
-                <div className="group relative min-h-[52px] rounded-md bg-eco-50 px-3 py-3 text-sm text-eco-900 dark:bg-eco-900/20 dark:text-eco-100">
-                  {isStart ? (
-                    <>
-                      <p className="font-semibold">{booking.meetingTitle}</p>
-                      <p className="text-xs">{booking.bookerName}</p>
-                      <p className="text-xs">
-                        {minutesToLabel(timeToMinutes(booking.startTime))} - {minutesToLabel(timeToMinutes(booking.endTime))}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="pt-1 text-xs text-eco-700/70 dark:text-eco-300/80">Booked</p>
-                  )}
-
-                  {canManageBooking(booking) && (
-                    <button
-                      type="button"
-                      aria-label="Cancel booking"
-                      onClick={() => onCancelBooking(booking)}
-                      className="absolute right-2 top-2 hidden h-6 w-6 items-center justify-center rounded-full bg-white text-red-600 shadow group-hover:flex dark:bg-slate-800"
-                    >
-                      ✕
-                    </button>
-                  )}
+              {booking && isStart && (
+                <div className="group relative rounded-md bg-eco-100 px-3 py-3 text-sm text-eco-900 dark:bg-eco-600/30 dark:text-eco-100">
+                  <p className="font-semibold">{booking.meetingTitle}</p>
+                  <p className="text-xs">{booking.bookerName}</p>
+                  <p className="text-xs">
+                    {minutesToLabel(timeToMinutes(booking.startTime))} - {minutesToLabel(timeToMinutes(booking.endTime))}
+                  </p>
+                  <button
+                    type="button"
+                    aria-label="Cancel booking"
+                    onClick={() => onCancelBooking(booking)}
+                    className="absolute right-2 top-2 hidden h-6 w-6 items-center justify-center rounded-full bg-white text-red-600 shadow group-hover:flex dark:bg-slate-800"
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
+
+              {booking && !isStart && <div className="h-full rounded-md bg-eco-50 dark:bg-eco-900/20" />}
             </div>
           </div>
         );
