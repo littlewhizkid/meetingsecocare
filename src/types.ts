@@ -4,8 +4,6 @@ export type Room = {
   icon: string;
 };
 
-export type BookingDuration = 30 | 60 | 120;
-
 export type Booking = {
   id: string;
   roomId: string;
@@ -13,14 +11,14 @@ export type Booking = {
   date: string; // YYYY-MM-DD local date
   startTime: string; // HH:mm
   endTime: string; // HH:mm
-  duration: BookingDuration;
-  bookerName: string;
   meetingTitle: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
   createdAt: string;
+  startAt: string;
+  endAt: string;
 };
-
-export type BookingsByDate = Record<string, Booking[]>;
-export type BookingsStore = Record<string, BookingsByDate>;
 
 export type Toast = {
   id: string;

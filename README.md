@@ -1,98 +1,119 @@
 # EcoCare Meeting Room Booking App
 
-Simple production-ready React + TypeScript + Tailwind web app for **EcoCare Head Office** room booking, intended for deployment at **meetings.ecocare.id**.
+Production-ready React + TypeScript + Tailwind web app for **EcoCare Head Office** room booking at **meetings.ecocare.id**.
+
+## What changed (new requirements)
+
+This version upgrades the app from local-only booking into an authenticated multi-user system with shared cloud persistence.
+
+### ✅ Booking duration (custom range)
+- Users can select **custom start and end times** (30-minute increments).
+- Supports long bookings (e.g. 5 hours, half-day, full-day within office hours).
+- Still prevents:
+  - overlaps,
+  - invalid ranges,
+  - bookings outside 8:00 AM–5:00 PM.
+
+### ✅ Authentication + access control
+- Google sign-in enabled with Firebase Authentication.
+- Every booking is tied to authenticated user (`userId`, `userName`, `userEmail`).
+- Normal users can:
+  - create bookings,
+  - see only their own bookings in **My Bookings**,
+  - cancel only their own bookings.
+- Optional admin mode:
+  - set `VITE_ADMIN_EMAILS` to allow admin users to view/manage all bookings.
+
+### ✅ Shared backend persistence
+- Uses **Firebase Firestore** (cloud database), not localStorage-only.
+- Bookings are shared across users/devices in real time.
 
 ## Features
+- 3 rooms: Board Room, Small Meeting Room, Podcast Room.
+- Day navigation (previous/next/today).
+- 30-minute slot grid view.
+- Modal booking form with custom start/end times.
+- Hover cancel button on booked slots (authorization-aware).
+- Upcoming bookings panel with search/filter.
+- Toast feedback.
+- Dark mode.
+- Responsive desktop/tablet layout.
 
-- Room-specific schedules:
-  - Board Room
-  - Small Meeting Room
-  - Podcast Room
-- Day-view schedule with:
-  - previous/next day arrows
-  - Today button
-- 30-minute slot booking from **8:00 AM–5:00 PM**
-- Booking modal with required fields:
-  - Booker name
-  - Meeting title
-  - Duration (30m / 1h / 2h)
-- Overlap prevention and office-hour validation
-- Booking cancellation with confirmation
-- Persistent local storage (`localStorage`) by room and date
-- Seed bookings on first run
-- “My Bookings” panel with upcoming bookings and booker-name filter
-- Toast notifications
-- Dark mode toggle
-- Responsive layout for desktop and tablet
-
-## Tech Stack
-
-- React 18
-- TypeScript
-- Vite
+## Tech stack
+- React 18 + TypeScript + Vite
 - Tailwind CSS
+- Firebase Auth (Google)
+- Firebase Firestore
 
-## Local Development
+## Environment variables
+Create `.env`:
+
+```bash
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+# Optional admin emails (comma separated)
+VITE_ADMIN_EMAILS=admin1@ecocare.id,admin2@ecocare.id
+```
+
+## Local development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local URL from Vite (usually `http://localhost:5173`).
-
-## Production Build
+## Build
 
 ```bash
 npm run build
 npm run preview
 ```
 
-Build output is generated in `dist/`.
+## Deployment to meetings.ecocare.id
 
-## Deployment Notes (meetings.ecocare.id)
+1. Add production Firebase environment variables in your deploy platform.
+2. Build the static assets (`npm run build`).
+3. Deploy `dist/` to static hosting (Nginx/Netlify/Vercel/Cloudflare Pages).
+4. Ensure Google OAuth redirect domain includes your production domain.
 
-This app is static and can be deployed to any static host (Nginx, Netlify, Vercel, Cloudflare Pages, S3+CloudFront).
-
-### Example: Nginx on `meetings.ecocare.id`
-
-1. Build locally or in CI:
-   ```bash
-   npm ci
-   npm run build
-   ```
-2. Upload `dist/` contents to server path, for example:
-   `/var/www/meetings.ecocare.id`
-3. Use an Nginx server block like:
+### Nginx SPA fallback
 
 ```nginx
-server {
-    listen 80;
-    server_name meetings.ecocare.id;
-
-    root /var/www/meetings.ecocare.id;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /assets/ {
-        add_header Cache-Control "public, max-age=31536000, immutable";
-    }
+location / {
+  try_files $uri $uri/ /index.html;
 }
 ```
 
-4. Add TLS (recommended using Let's Encrypt).
+## Firestore data model
+Collection: `bookings`
 
-## Data Storage
+Fields:
+- `roomId`, `roomName`
+- `date` (YYYY-MM-DD)
+- `startTime`, `endTime` (HH:mm)
+- `startAt`, `endAt` (Timestamp)
+- `meetingTitle`
+- `userName`, `userId`, `userEmail`
+- `createdAt`
 
-- Browser `localStorage` key: `ecocare_meeting_bookings_v1`
-- Data shape:
-  - `roomId -> date(YYYY-MM-DD) -> Booking[]`
+## Recommended Firestore security rules (example)
 
-## Future Enhancements
+```txt
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /bookings/{bookingId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+  }
+}
+```
 
-- Backend API integration (multi-user shared data)
-- Authentication & role-based cancellation rules
-- Room availability analytics
+(Adjust admin policies based on your internal security model.)
