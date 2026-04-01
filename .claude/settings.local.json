@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)",
+      "Bash(DATABASE_URL=\"file:./dev.db\" npx prisma migrate dev --name init)",
+      "Bash(DATABASE_URL=\"file:./dev.db\" npm run build)",
+      "Bash(ls /Users/richardsamantha/Documents/repos/meetingsecocare/.env*)",
+      "Bash(DATABASE_URL=\"file:./dev.db\" npx prisma migrate dev --name credentials-auth)",
+      "Bash(npm --version)",
+      "Bash(ls /Users/richardsamantha/Documents/repos/meetingsecocare/prisma/*.db)",
+      "Bash(npm list:*)",
+      "Bash(test -f /Users/richardsamantha/Documents/repos/meetingsecocare/src/app/api/auth/[...nextauth]/route.ts)",
+      "Bash(DATABASE_URL=\"file:./prisma/dev.db\" npx prisma migrate dev --name add-must-change-password)",
+      "Bash(DATABASE_URL=\"file:./prisma/dev.db\" npx ts-node --compiler-options '{\"\"module\"\":\"\"CommonJS\"\"}' scripts/import-users.ts --file users.csv)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
