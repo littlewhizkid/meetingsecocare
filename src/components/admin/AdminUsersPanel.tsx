@@ -59,6 +59,7 @@ export function AdminUsersPanel() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ user: UserRow; count: number } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<UserRow | null>(null);
   const [search, setSearch] = useState('');
 
   const fetchUsers = async () => {
@@ -231,7 +232,7 @@ export function AdminUsersPanel() {
                         className="px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap">
                         🔑 Reset PW
                       </button>
-                      <button onClick={() => handleDelete(user)}
+                      <button onClick={() => setPendingDelete(user)}
                         className="px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
                         Delete
                       </button>
@@ -344,6 +345,23 @@ export function AdminUsersPanel() {
                 <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors disabled:opacity-50">{saving ? 'Resetting...' : 'Reset Password'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Are you sure? — initial delete prompt */}
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-base font-bold text-gray-900 mb-3">Delete User?</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              Are you sure you want to delete <strong>{pendingDelete.name}</strong> ({pendingDelete.email})?
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setPendingDelete(null)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">Cancel</button>
+              <button onClick={() => { const u = pendingDelete; setPendingDelete(null); handleDelete(u); }} className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">Yes, Delete</button>
+            </div>
           </div>
         </div>
       )}
