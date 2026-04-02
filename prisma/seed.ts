@@ -3,60 +3,35 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-function getTodayStr(): string {
-  return new Date().toISOString().split('T')[0];
-}
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-}
-
 async function main() {
+  // Seed rooms with exact IDs matching existing booking data
+  const rooms = [
+    { id: 'board-room', name: 'Board Room', description: 'Main conference room with projector & video conferencing', capacity: '12 people', icon: '🏛️', order: 1 },
+    { id: 'small-meeting-room', name: 'Small Meeting Room', description: 'Intimate discussion space with whiteboard', capacity: '6 people', icon: '💼', order: 2 },
+    { id: 'podcast-room', name: 'Podcast Room', description: 'Soundproofed recording studio', capacity: '10 people', icon: '🎙️', order: 3 },
+    { id: 'interview-room', name: 'Interview Room', description: 'Private space for interviews and 1-on-1s', capacity: '4 people', icon: '🤝', order: 4 },
+  ];
+
+  for (const room of rooms) {
+    await prisma.room.upsert({ where: { id: room.id }, update: room, create: room });
+  }
+  console.log('Rooms seeded.');
+
+  // Also keep existing user seeds
   const adminPass = await bcrypt.hash('admin1234', 12);
   const userPass = await bcrypt.hash('user1234', 12);
 
-  const admin = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: 'admin@ecocare.id' },
     update: {},
     create: { email: 'admin@ecocare.id', name: 'Admin EcoCare', password: adminPass, role: 'ADMIN' },
   });
-
-  const user1 = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: 'budi@ecocare.id' },
     update: {},
     create: { email: 'budi@ecocare.id', name: 'Budi Santoso', password: userPass, role: 'USER' },
   });
-
-  const user2 = await prisma.user.upsert({
-    where: { email: 'sari@ecocare.id' },
-    update: {},
-    create: { email: 'sari@ecocare.id', name: 'Sari Dewi', password: userPass, role: 'USER' },
-  });
-
-  const today = getTodayStr();
-  const tomorrow = addDays(today, 1);
-  const dayAfter = addDays(today, 2);
-
-  await prisma.booking.deleteMany({});
-
-  await prisma.booking.createMany({
-    data: [
-      { roomId: 'board-room', roomName: 'Board Room', date: today, startTime: '09:00', endTime: '11:00', bookerName: 'Budi Santoso', meetingTitle: 'Weekly Leadership Sync', userId: admin.id },
-      { roomId: 'small-meeting-room', roomName: 'Small Meeting Room', date: today, startTime: '10:00', endTime: '11:00', bookerName: 'Sari Dewi', meetingTitle: 'Product Review Q4', userId: user2.id },
-      { roomId: 'podcast-room', roomName: 'Podcast Room', date: today, startTime: '14:00', endTime: '16:00', bookerName: 'Budi Santoso', meetingTitle: 'EcoCare Podcast Episode 12', userId: user1.id },
-      { roomId: 'board-room', roomName: 'Board Room', date: tomorrow, startTime: '09:00', endTime: '12:00', bookerName: 'Admin EcoCare', meetingTitle: 'Budget Planning Half Day', userId: admin.id },
-      { roomId: 'small-meeting-room', roomName: 'Small Meeting Room', date: tomorrow, startTime: '13:00', endTime: '14:30', bookerName: 'Sari Dewi', meetingTitle: 'Design Sprint Kickoff', userId: user2.id },
-      { roomId: 'board-room', roomName: 'Board Room', date: dayAfter, startTime: '08:00', endTime: '17:00', bookerName: 'Budi Santoso', meetingTitle: 'Annual Strategy Day', userId: user1.id },
-    ],
-  });
-
-  console.log('Seed completed. Test credentials:');
-  console.log('  Admin: admin@ecocare.id / admin1234');
-  console.log('  User:  budi@ecocare.id  / user1234');
+  console.log('Seed done.');
 }
 
-main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect());
+main().catch(console.error).finally(() => prisma.$disconnect());

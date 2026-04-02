@@ -17,6 +17,7 @@ export interface Room {
   description: string;
   capacity: string;
   icon: string;
+  order?: number;
 }
 
 export interface TimeSlot {

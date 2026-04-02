@@ -1,12 +1,13 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import Link from 'next/link';
 import { Booking } from '@/types';
-import { ROOMS } from '@/constants';
 import { getTodayStr } from '@/utils/dateUtils';
 import { useBookings } from '@/hooks/useBookings';
 import { useToast } from '@/hooks/useToast';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
+import { useRooms } from '@/hooks/useRooms';
 import { DayNavigation } from './DayNavigation';
 import { BookingGrid } from './BookingGrid';
 import { BookingModal } from './BookingModal';
@@ -22,13 +23,15 @@ export function BookingApp() {
   const [loadingGrid, setLoadingGrid] = useState(false);
   const [showMyBookings, setShowMyBookings] = useState(false);
 
+  const { rooms, loading: roomsLoading } = useRooms();
+
   const [bookingModal, setBookingModal] = useState<{
     isOpen: boolean;
     roomId: string;
     startTime: string;
   }>({
     isOpen: false,
-    roomId: ROOMS[0].id,
+    roomId: '',
     startTime: '09:00',
   });
 
@@ -46,31 +49,32 @@ export function BookingApp() {
   const isAdmin = session?.user?.role === 'ADMIN';
   const userId = session?.user?.id ?? '';
   const userName = session?.user?.name ?? '';
-  const selectedRoom = ROOMS.find(r => r.id === bookingModal.roomId) ?? ROOMS[0];
+  const selectedRoom = rooms.find(r => r.id === bookingModal.roomId) ?? rooms[0];
 
   const { newBookings, unreadCount, markAllSeen, refresh: refreshNotifications } =
     useAdminNotifications(isAdmin);
 
   // Fetch all rooms' bookings for the selected date in parallel
   const refreshGrid = useCallback(async () => {
+    if (rooms.length === 0) return;
     setLoadingGrid(true);
     try {
       const results = await Promise.all(
-        ROOMS.map(room =>
+        rooms.map(room =>
           fetch(`/api/bookings?roomId=${room.id}&date=${selectedDate}`)
             .then(r => (r.ok ? r.json() : []))
             .catch(() => [])
         )
       );
       const byRoom: Record<string, Booking[]> = {};
-      ROOMS.forEach((room, i) => {
+      rooms.forEach((room, i) => {
         byRoom[room.id] = results[i];
       });
       setBookingsByRoom(byRoom);
     } finally {
       setLoadingGrid(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, rooms]);
 
   useEffect(() => {
     refreshGrid();
@@ -88,7 +92,7 @@ export function BookingApp() {
   }) => {
     const result = await addBooking({
       roomId: bookingModal.roomId,
-      roomName: selectedRoom.name,
+      roomName: selectedRoom?.name ?? '',
       date: selectedDate,
       userId,
       ...data,
@@ -149,11 +153,23 @@ export function BookingApp() {
 
             {/* Notification bell — admin only */}
             {isAdmin && (
-              <NotificationBell
-                newBookings={newBookings}
-                unreadCount={unreadCount}
-                onMarkAllSeen={markAllSeen}
-              />
+              <>
+                <NotificationBell
+                  newBookings={newBookings}
+                  unreadCount={unreadCount}
+                  onMarkAllSeen={markAllSeen}
+                />
+                <Link
+                  href="/admin"
+                  className="p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-colors text-gray-600"
+                  title="Admin Settings"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </Link>
+              </>
             )}
 
             {/* User */}
@@ -190,7 +206,7 @@ export function BookingApp() {
 
         {/* All-rooms grid */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm flex-1 flex flex-col overflow-hidden">
-          {loadingGrid ? (
+          {roomsLoading || loadingGrid ? (
             <div className="flex-1 flex items-center justify-center text-gray-400 gap-2">
               <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -200,7 +216,7 @@ export function BookingApp() {
             </div>
           ) : (
             <BookingGrid
-              rooms={ROOMS}
+              rooms={rooms}
               selectedDate={selectedDate}
               bookingsByRoom={bookingsByRoom}
               currentUserId={userId}
@@ -215,7 +231,7 @@ export function BookingApp() {
       {/* ── Modals ── */}
       <BookingModal
         isOpen={bookingModal.isOpen}
-        roomName={selectedRoom.name}
+        roomName={selectedRoom?.name ?? ''}
         roomId={bookingModal.roomId}
         date={selectedDate}
         initialStartTime={bookingModal.startTime}

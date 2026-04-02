@@ -31,3 +31,13 @@ model Booking {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
 }
+
+model Room {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  capacity    String   @default("")
+  icon        String   @default("🏢")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+}
