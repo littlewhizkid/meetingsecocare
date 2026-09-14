@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -19,25 +19,35 @@ model User {
 }
 
 model Booking {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
+  room         Room      @relation(fields: [roomId], references: [id], onDelete: Restrict)
   roomId       String
   roomName     String
-  date         String
-  startTime    String
-  endTime      String
+  /// Half-open interval [startAt, endAt) in UTC. All-day bookings span
+  /// civil midnights in the canonical office timezone (Asia/Jakarta).
+  startAt      DateTime
+  endAt        DateTime
+  allDay       Boolean   @default(false)
   bookerName   String
   meetingTitle String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([roomId, startAt])
+  @@index([roomId, endAt])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Room {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
-  description String   @default("")
-  capacity    String   @default("")
-  icon        String   @default("🏢")
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
+  description String    @default("")
+  capacity    String    @default("")
+  icon        String    @default("🏢")
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  bookings    Booking[]
 }

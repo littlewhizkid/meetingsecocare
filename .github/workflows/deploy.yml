@@ -1,0 +1,59 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    # only deploy the exact commit that CI ran on, and only when CI succeeded
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Assert same commit as CI
+        run: |
+          echo "CI ran on: ${{ github.event.workflow_run.head_sha }}"
+          git ls-remote origin main | grep "${{ github.event.workflow_run.head_sha }}" || {
+            echo "main has moved on since CI ran — aborting deploy to avoid deploying untested code"; exit 1;
+          }
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            cd /var/www/meetingsecocare
+            echo "=== current HEAD ==="
+            git rev-parse HEAD
+            echo "=== pull ==="
+            git stash --include-untracked -q || true
+            git fetch origin main
+            git reset --hard origin/main
+            echo "=== install ==="
+            npm ci
+            npx prisma generate
+            echo "=== migrate ==="
+            npx prisma migrate deploy
+            echo "=== build ==="
+            npm run build
+            echo "=== restart ==="
+            pm2 restart meetingsecocare --update-env
+            sleep 3
+            pm2 status meetingsecocare
+            echo "=== health check ==="
+            curl -sf http://localhost:3000/api/bookings -o /dev/null && echo "API responding (401 expected)" || (echo "HEALTH CHECK FAILED"; pm2 logs meetingsecocare --lines 30 --nostream; exit 1)

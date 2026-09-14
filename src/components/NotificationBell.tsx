@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
 import { Booking } from '@/types';
-import { formatDisplayDate, formatTimeDisplay } from '@/utils/dateUtils';
+import { formatBookingRange } from '@/utils/dateUtils';
 
 interface Props {
   newBookings: Booking[];
@@ -95,9 +95,7 @@ export function NotificationBell({ newBookings, unreadCount, onMarkAllSeen }: Pr
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span>{formatDisplayDate(b.date)}</span>
-                    <span>·</span>
-                    <span>{formatTimeDisplay(b.startTime)} – {formatTimeDisplay(b.endTime)}</span>
+                    <span>{formatBookingRange(b)}</span>
                   </div>
                 </div>
               ))

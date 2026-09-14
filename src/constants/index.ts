@@ -1,47 +1,17 @@
-import { Room, TimeSlot } from '@/types';
+import { TimeSlot } from '@/types';
 
-export const ROOMS: Room[] = [
-  {
-    id: 'board-room',
-    name: 'Board Room',
-    description: 'Main conference room with projector & video conferencing',
-    capacity: '12 people',
-    icon: '🏛️',
-  },
-  {
-    id: 'small-meeting-room',
-    name: 'Small Meeting Room',
-    description: 'Intimate discussion space with whiteboard',
-    capacity: '6 people',
-    icon: '💼',
-  },
-  {
-    id: 'podcast-room',
-    name: 'Podcast Room',
-    description: 'Soundproofed recording studio',
-    capacity: '10 people',
-    icon: '🎙️',
-  },
-  {
-    id: 'interview-room',
-    name: 'Interview Room',
-    description: 'Private space for interviews and 1-on-1s',
-    capacity: '4 people',
-    icon: '🤝',
-  },
-];
-
-export const WORKING_START = '08:00';
-export const WORKING_END = '17:00';
-
-// Generate slots from 08:00 to 16:30 in 30-min increments (18 slots for start times)
-// End time slots: 08:30 to 17:00
+// Generate slots from 08:00 to 17:00 in 30-min increments.
+// Start slots: 08:00–16:30 (16:30 is the last valid 30-min start).
+// End slots: 08:30–17:00.
 function generateSlots(includeEnd: boolean): TimeSlot[] {
   const slots: TimeSlot[] = [];
-  for (let h = 8; h < 17; h++) {
+  for (let h = 8; h <= 17; h++) {
+    const isEndBoundary = h === 17;
     for (let m = 0; m < 60; m += 30) {
-      if (!includeEnd && h === 16 && m === 30) continue; // 16:30 is last valid start
-      // skip 17:00 for start slots
+      if (isEndBoundary) {
+        if (!includeEnd) continue;      // 17:00 only for end slots
+        if (m !== 0) continue;          // only 17:00, not 17:30
+      }
       const hh = String(h).padStart(2, '0');
       const mm = String(m).padStart(2, '0');
       const time = `${hh}:${mm}`;
@@ -51,14 +21,14 @@ function generateSlots(includeEnd: boolean): TimeSlot[] {
       slots.push({ time, label });
     }
   }
-  if (includeEnd) {
-    slots.push({ time: '17:00', label: '5:00 PM' });
-  }
   return slots;
 }
 
-export const START_TIME_SLOTS: TimeSlot[] = generateSlots(false);
+export const START_TIME_SLOTS: TimeSlot[] = generateSlots(false).filter(s => s.time !== '17:00');
 export const END_TIME_SLOTS: TimeSlot[] = generateSlots(true).filter(s => s.time !== '08:00');
 
-// All display slots (08:00 to 16:30) for the grid
-export const DISPLAY_SLOTS: TimeSlot[] = generateSlots(false);
+// All display slots 08:00–17:00 for the grid (17 rows)
+export const DISPLAY_SLOTS: TimeSlot[] = [
+  ...generateSlots(false).filter(s => s.time !== '17:00'),
+  { time: '17:00', label: '5:00 PM' },
+];

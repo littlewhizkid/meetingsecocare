@@ -13,3 +13,7 @@ prisma/prod.db-journal
 tsconfig.tsbuildinfo
 users.csv
 .claude/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

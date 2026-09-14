@@ -1,63 +1,56 @@
 import { Booking } from '@/types';
-import { timeToMinutes } from './dateUtils';
 
+/**
+ * Half-open interval overlap: [aStart, aEnd) vs [bStart, bEnd).
+ * Adjacent bookings (aEnd === bStart) do NOT overlap.
+ * Accepts ISO strings or Dates for existing booking bounds.
+ */
 export function hasOverlap(
-  bookings: Booking[],
   roomId: string,
-  date: string,
-  startTime: string,
-  endTime: string,
+  startAt: Date,
+  endAt: Date,
+  existing: Booking[],
   excludeId?: string
 ): boolean {
-  const newStart = timeToMinutes(startTime);
-  const newEnd = timeToMinutes(endTime);
-  return bookings
-    .filter(b => b.roomId === roomId && b.date === date && b.id !== excludeId)
+  return existing
+    .filter(b => b.roomId === roomId && b.id !== excludeId)
     .some(b => {
-      const bStart = timeToMinutes(b.startTime);
-      const bEnd = timeToMinutes(b.endTime);
-      return newStart < bEnd && newEnd > bStart;
+      const bStart = new Date(b.startAt);
+      const bEnd = new Date(b.endAt);
+      return startAt < bEnd && endAt > bStart;
     });
 }
 
-export function getBookingAtSlot(
-  bookings: Booking[],
-  roomId: string,
-  date: string,
-  slotTime: string
-): Booking | undefined {
-  const slotMins = timeToMinutes(slotTime);
-  return bookings.find(b => {
-    if (b.roomId !== roomId || b.date !== date) return false;
-    const start = timeToMinutes(b.startTime);
-    const end = timeToMinutes(b.endTime);
-    return slotMins >= start && slotMins < end;
-  });
+/**
+ * Clip a booking's interval to the displayed civil day [00:00, 24:00) in
+ * office time. Returns null if the booking does not intersect the day.
+ */
+export function clipToDay(
+  booking: Booking,
+  dayStartUTC: Date,
+  dayEndUTC: Date
+): { start: Date; end: Date } | null {
+  const start = new Date(booking.startAt);
+  const end = new Date(booking.endAt);
+  if (start >= dayEndUTC || end <= dayStartUTC) return null;
+  return {
+    start: start < dayStartUTC ? dayStartUTC : start,
+    end: end > dayEndUTC ? dayEndUTC : end,
+  };
 }
 
-export function isSlotStart(booking: Booking, slotTime: string): boolean {
-  return booking.startTime === slotTime;
-}
-
-export function getBookingHeightSlots(booking: Booking): number {
-  const start = timeToMinutes(booking.startTime);
-  const end = timeToMinutes(booking.endTime);
-  return (end - start) / 30;
+/** Minutes from office-midnight for an instant clipped to a given day */
+export function minutesIntoDay(instant: Date, dayStartUTC: Date): number {
+  return Math.round((instant.getTime() - dayStartUTC.getTime()) / 60000);
 }
 
 export function getUpcomingBookings(bookings: Booking[]): Booking[] {
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
-  const nowMins = now.getHours() * 60 + now.getMinutes();
-
   return bookings
-    .filter(b => {
-      if (b.date > todayStr) return true;
-      if (b.date === todayStr) return timeToMinutes(b.endTime) > nowMins;
-      return false;
-    })
+    .filter(b => new Date(b.endAt) > now)
     .sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
+      const aStart = new Date(a.startAt).getTime();
+      const bStart = new Date(b.startAt).getTime();
+      return aStart - bStart;
     });
 }

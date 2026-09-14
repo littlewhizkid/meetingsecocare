@@ -41,10 +41,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const force = searchParams.get('force') === 'true';
 
   if (!force) {
-    const today = new Date().toISOString().split('T')[0];
-    const futureBooking = await prisma.booking.findFirst({ where: { userId: params.id, date: { gte: today } } });
+    const futureBooking = await prisma.booking.findFirst({ where: { userId: params.id, endAt: { gt: new Date() } } });
     if (futureBooking) {
-      const count = await prisma.booking.count({ where: { userId: params.id, date: { gte: today } } });
+      const count = await prisma.booking.count({ where: { userId: params.id, endAt: { gt: new Date() } } });
       return NextResponse.json({ error: 'User has future bookings', count }, { status: 409 });
     }
   }

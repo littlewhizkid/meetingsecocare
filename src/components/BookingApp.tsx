@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
-import { Booking } from '@/types';
+import { Booking, BookingCreateInput } from '@/types';
 import { getTodayStr } from '@/utils/dateUtils';
 import { useBookings } from '@/hooks/useBookings';
 import { useToast } from '@/hooks/useToast';
@@ -29,10 +29,14 @@ export function BookingApp() {
     isOpen: boolean;
     roomId: string;
     startTime: string;
+    allDayPrefill: boolean;
+    editingBooking: Booking | null;
   }>({
     isOpen: false,
     roomId: '',
     startTime: '09:00',
+    allDayPrefill: false,
+    editingBooking: null,
   });
 
   const [confirmModal, setConfirmModal] = useState<{
@@ -43,34 +47,31 @@ export function BookingApp() {
     booking: null,
   });
 
-  const { addBooking, cancelBooking } = useBookings();
+  const { addBooking, updateBooking, cancelBooking } = useBookings();
   const { toasts, showToast, removeToast } = useToast();
 
   const isAdmin = session?.user?.role === 'ADMIN';
   const userId = session?.user?.id ?? '';
   const userName = session?.user?.name ?? '';
-  const selectedRoom = rooms.find(r => r.id === bookingModal.roomId) ?? rooms[0];
 
   const { newBookings, unreadCount, markAllSeen, refresh: refreshNotifications } =
     useAdminNotifications(isAdmin);
 
-  // Fetch all rooms' bookings for the selected date in parallel
+  // Fetch bookings intersecting the selected day (single request)
   const refreshGrid = useCallback(async () => {
-    if (rooms.length === 0) return;
     setLoadingGrid(true);
     try {
-      const results = await Promise.all(
-        rooms.map(room =>
-          fetch(`/api/bookings?roomId=${room.id}&date=${selectedDate}`)
-            .then(r => (r.ok ? r.json() : []))
-            .catch(() => [])
-        )
-      );
+      const res = await fetch(`/api/bookings?date=${selectedDate}`);
+      const data: Booking[] = res.ok ? await res.json() : [];
       const byRoom: Record<string, Booking[]> = {};
-      rooms.forEach((room, i) => {
-        byRoom[room.id] = results[i];
+      rooms.forEach(room => { byRoom[room.id] = []; });
+      data.forEach(b => {
+        if (!byRoom[b.roomId]) byRoom[b.roomId] = [];
+        byRoom[b.roomId].push(b);
       });
       setBookingsByRoom(byRoom);
+    } catch {
+      setBookingsByRoom({});
     } finally {
       setLoadingGrid(false);
     }
@@ -80,31 +81,50 @@ export function BookingApp() {
     refreshGrid();
   }, [refreshGrid]);
 
-  const handleSlotClick = (roomId: string, slotTime: string) => {
-    setBookingModal({ isOpen: true, roomId, startTime: slotTime });
+  const openNewBooking = (roomId: string, slotTime: string) => {
+    const allDay = slotTime === 'allday';
+    setBookingModal({
+      isOpen: true,
+      roomId: roomId || rooms[0]?.id || '',
+      startTime: allDay ? '09:00' : slotTime,
+      allDayPrefill: allDay,
+      editingBooking: null,
+    });
   };
 
-  const handleBookingSubmit = async (data: {
-    startTime: string;
-    endTime: string;
-    bookerName: string;
-    meetingTitle: string;
-  }) => {
-    const result = await addBooking({
-      roomId: bookingModal.roomId,
-      roomName: selectedRoom?.name ?? '',
-      date: selectedDate,
-      userId,
-      ...data,
+  const handleNewEventClick = () => {
+    setBookingModal({
+      isOpen: true,
+      roomId: rooms[0]?.id ?? '',
+      startTime: '09:00',
+      allDayPrefill: false,
+      editingBooking: null,
     });
+  };
+
+  const openEditBooking = (booking: Booking) => {
+    setBookingModal({
+      isOpen: true,
+      roomId: booking.roomId,
+      startTime: '09:00',
+      allDayPrefill: booking.allDay,
+      editingBooking: booking,
+    });
+  };
+
+  const handleBookingSubmit = async (data: BookingCreateInput) => {
+    const editing = bookingModal.editingBooking;
+    const result = editing
+      ? await updateBooking(editing.id, data)
+      : await addBooking(data);
 
     if (result.success) {
-      showToast(`Booking confirmed: ${data.meetingTitle}`, 'success');
-      setBookingModal(prev => ({ ...prev, isOpen: false }));
+      showToast(editing ? 'Booking updated' : `Booking confirmed: ${data.meetingTitle}`, 'success');
+      setBookingModal(prev => ({ ...prev, isOpen: false, editingBooking: null }));
       refreshGrid();
       refreshNotifications();
     } else {
-      showToast(result.error ?? 'Failed to create booking', 'error');
+      showToast(result.error ?? 'Failed to save booking', 'error');
     }
   };
 
@@ -139,6 +159,17 @@ export function BookingApp() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* New Event */}
+            <button
+              onClick={handleNewEventClick}
+              className="flex items-center gap-2 px-4 py-2 bg-brand-600 border border-brand-600 text-white rounded-xl text-sm font-semibold hover:bg-brand-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="hidden sm:inline">New Event</span>
+            </button>
+
             {/* My Bookings */}
             <button
               onClick={() => setShowMyBookings(true)}
@@ -221,7 +252,8 @@ export function BookingApp() {
               bookingsByRoom={bookingsByRoom}
               currentUserId={userId}
               isAdmin={isAdmin}
-              onSlotClick={handleSlotClick}
+              onSlotClick={openNewBooking}
+              onEditBooking={openEditBooking}
               onCancelBooking={handleCancelRequest}
             />
           )}
@@ -231,19 +263,21 @@ export function BookingApp() {
       {/* ── Modals ── */}
       <BookingModal
         isOpen={bookingModal.isOpen}
-        roomName={selectedRoom?.name ?? ''}
-        roomId={bookingModal.roomId}
+        rooms={rooms}
         date={selectedDate}
+        initialRoomId={bookingModal.roomId}
         initialStartTime={bookingModal.startTime}
+        allDayPrefill={bookingModal.allDayPrefill}
+        editingBooking={bookingModal.editingBooking}
         existingBookings={bookingsByRoom[bookingModal.roomId] ?? []}
-        userName={userName}
-        onClose={() => setBookingModal(prev => ({ ...prev, isOpen: false }))}
+        onClose={() => setBookingModal(prev => ({ ...prev, isOpen: false, editingBooking: null }))}
         onSubmit={handleBookingSubmit}
       />
 
       <MyBookings
         isOpen={showMyBookings}
         isAdmin={isAdmin}
+        rooms={rooms}
         onClose={() => setShowMyBookings(false)}
         onCancelBooking={booking => {
           setShowMyBookings(false);

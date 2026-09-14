@@ -35,3 +35,4 @@ async function main() {
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
+// E2E cleanup helper invoked via: npm run db:seed -- --e2e-clean

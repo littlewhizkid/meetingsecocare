@@ -31,12 +31,11 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const force = searchParams.get('force') === 'true';
 
   if (!force) {
-    const today = new Date().toISOString().split('T')[0];
     const futureBooking = await prisma.booking.findFirst({
-      where: { roomId: params.id, date: { gte: today } },
+      where: { roomId: params.id, endAt: { gt: new Date() } },
     });
     if (futureBooking) {
-      const count = await prisma.booking.count({ where: { roomId: params.id, date: { gte: today } } });
+      const count = await prisma.booking.count({ where: { roomId: params.id, endAt: { gt: new Date() } } });
       return NextResponse.json({ error: 'Room has future bookings', count }, { status: 409 });
     }
   }

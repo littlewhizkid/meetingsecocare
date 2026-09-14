@@ -8,18 +8,22 @@ Internal meeting room booking system for EcoCare Head Office.
 
 - **Frontend/Backend:** Next.js 14 (App Router)
 - **Auth:** NextAuth.js v4 — username/password (Credentials provider)
-- **Database:** Prisma ORM — SQLite (dev) / PostgreSQL (prod)
+- **Database:** Prisma ORM + PostgreSQL
 - **Styling:** Tailwind CSS
 - **Language:** TypeScript
+- **Dates/Times:** Luxon — all bookings in Asia/Jakarta (WIB), stored as UTC
 
 ## Features
 
-- Book meeting rooms with custom start/end time (30-min increments, 8 AM–5 PM)
-- Three rooms: Board Room, Small Meeting Room, Podcast Room
+- Book meeting rooms with start/end **date and time** (30-min increments, 8 AM–5 PM)
+- Bookings can span multiple days (continuous room hold)
+- **All-day bookings** with an inclusive date range (e.g. Dec 14–16 occupies all three days)
+- Create bookings from the "New Event" button or by clicking any free slot
+- Edit or cancel bookings (owner or admin)
+- Overlap prevention enforced **at the database level** (Postgres exclusion constraint) — race-safe
 - Users see only their own bookings; Admins see all
 - CSV-based user management — create/update accounts in bulk
-- Overlap prevention and working-hours enforcement
-- Day-by-day schedule view with booking grid
+- Day-by-day schedule view with booking grid, all-day lane, and cross-day clipping
 
 ## Prerequisites
 
@@ -42,12 +46,15 @@ Edit `.env.local`:
 ```
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=<run: openssl rand -base64 32>
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://user:password@localhost:5432/ecocare_meetings?schema=public"
 ```
 
 ### 3. Set up the database
+
+PostgreSQL is required (16 or 17 recommended). Create a database and user, then:
+
 ```bash
-npx prisma migrate dev --name init
+npm run db:deploy
 ```
 
 ### 4. Create users
@@ -122,11 +129,22 @@ npm run users:import -- --file path/to/users.csv
    - `NEXTAUTH_SECRET` = your secret
    - `DATABASE_URL` = your Postgres connection string
 5. Deploy — Vercel runs `prisma generate && next build` automatically
-6. After first deploy, run migration:
+6. During a maintenance window, run migration (see "Production migration note" below):
    ```bash
    npx prisma migrate deploy
    ```
 7. Import your users CSV from local machine (pointing DATABASE_URL to prod DB)
+
+> **Production migration note:** the migration history was rebased for
+> PostgreSQL (`20260914000000_postgres_baseline`). If your production database
+> already has tables (from the pre-Postgres SQLite history or a manual
+> `prisma db push`), do NOT run `migrate deploy` directly — baseline it first
+> with `npx prisma migrate resolve --applied 20260914000000_postgres_baseline`
+> after verifying the schema matches, or restore the backup. The
+> `20260914120000_interval_booking_model` migration then converts the legacy
+> `date`/`startTime`/`endTime` columns to `startAt`/`endAt`/`allDay`
+> (interpreted as Asia/Jakarta wall-clock times) and adds the overlap
+> prevention constraint.
 
 ### Option B: Self-hosted (nginx + Node.js)
 
@@ -170,8 +188,17 @@ npm run users:import -- --file path/to/users.csv
 
 ## Booking Rules
 
-- Working hours: 8:00 AM – 5:00 PM
-- Minimum booking: 30 minutes
-- Maximum booking: Full day (8 AM – 5 PM)
-- Time slots: 30-minute increments
-- No overlapping bookings per room
+- Timezone: Asia/Jakarta (WIB, UTC+7) — all dates/times are interpreted in WIB and stored as UTC
+- Working hours: 8:00 AM – 5:00 PM (30-minute increments)
+- Timed bookings may span multiple dates; the room is held continuously
+- All-day bookings occupy every day in the selected inclusive range (checkout-style: the stored end is midnight after the last day)
+- End times are exclusive: a booking may start exactly when another ends (back-to-back is allowed)
+- No overlapping bookings per room — enforced by a Postgres exclusion constraint (concurrency-safe)
+
+## Testing
+
+```bash
+npm run typecheck          # TypeScript
+npm test                   # Vitest unit + DB integration tests (requires local Postgres)
+npm run test:e2e           # Playwright E2E (requires dev server or auto-starts one)
+```
