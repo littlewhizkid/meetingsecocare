@@ -25,6 +25,7 @@ interface Props {
 
 const SLOT_HEIGHT = 56; // px per 30-min slot
 const ALL_DAY_ROW_HEIGHT = 44; // px
+const DAY_START_MIN = 8 * 60;  // 08:00 in minutes since midnight
 
 export function BookingGrid({
   rooms,
@@ -148,10 +149,11 @@ export function BookingGrid({
         <div className="flex">
 
           {/* Time column */}
-          <div className="w-20 flex-shrink-0 border-r border-gray-100">
+          <div data-testid="time-column" className="w-20 flex-shrink-0 border-r border-gray-100">
             {DISPLAY_SLOTS.map(slot => (
               <div
                 key={slot.time}
+                data-testid={`slot-label-${slot.time}`}
                 style={{ height: `${SLOT_HEIGHT}px` }}
                 className="flex items-start justify-end pr-3 pt-2 border-b border-gray-50"
               >
@@ -217,7 +219,8 @@ export function BookingGrid({
                 {roomBookings.map(({ booking, clip }) => {
                   const startMin = minutesIntoDay(clip.start, dayBounds.start);
                   const endMin = minutesIntoDay(clip.end, dayBounds.start);
-                  const topPx = (startMin / 30) * SLOT_HEIGHT;
+                  // y=0 of the grid body is 08:00 (DAY_START_MIN)
+                  const topPx = ((startMin - DAY_START_MIN) / 30) * SLOT_HEIGHT;
                   const heightPx = ((endMin - startMin) / 30) * SLOT_HEIGHT - 6;
                   const startsBefore = startsBeforeDay(booking);
                   const endsAfter = endsAfterDay(booking);
@@ -234,6 +237,7 @@ export function BookingGrid({
                   return (
                     <div
                       key={booking.id}
+                      data-testid={`booking-card-${booking.id}`}
                       style={{ top: `${topPx + 3}px`, height: `${Math.max(heightPx, 20)}px` }}
                       className={`absolute inset-x-1.5 rounded-xl flex flex-col justify-center px-3 z-10 shadow-sm transition-shadow select-none ${
                         isPast

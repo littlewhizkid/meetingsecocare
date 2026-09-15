@@ -27,8 +27,6 @@ function generateSlots(includeEnd: boolean): TimeSlot[] {
 export const START_TIME_SLOTS: TimeSlot[] = generateSlots(false).filter(s => s.time !== '17:00');
 export const END_TIME_SLOTS: TimeSlot[] = generateSlots(true).filter(s => s.time !== '08:00');
 
-// All display slots 08:00–17:00 for the grid (17 rows)
-export const DISPLAY_SLOTS: TimeSlot[] = [
-  ...generateSlots(false).filter(s => s.time !== '17:00'),
-  { time: '17:00', label: '5:00 PM' },
-];
+// All display band-start labels for the grid: 08:00–16:30 (18 half-hour
+// bands covering 08:00–17:00; each label marks the START of its band)
+export const DISPLAY_SLOTS: TimeSlot[] = generateSlots(false);
