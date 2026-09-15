@@ -60,9 +60,10 @@ jobs:
             sleep 3
             pm2 status meetingsecocare
             echo "=== health check ==="
-            CODE=\$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/bookings)
-            echo "API status: \$CODE (401 = healthy, auth enforced)"
-            case "\$CODE" in
-              200|401) echo "HEALTH CHECK PASSED";;
-              *) echo "HEALTH CHECK FAILED"; pm2 logs meetingsecocare --lines 30 --nostream; exit 1;;
-            esac
+            curl -s -o /dev/null -w "API status: %{http_code} (401 = healthy, auth enforced)\n" http://localhost:3000/api/bookings
+            if ! curl -s -o /dev/null http://localhost:3000/api/bookings; then
+              echo "HEALTH CHECK FAILED — no response from app"
+              pm2 logs meetingsecocare --lines 30 --nostream
+              exit 1
+            fi
+            echo "HEALTH CHECK PASSED"
